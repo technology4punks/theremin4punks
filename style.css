@@ -1,0 +1,149 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #121212;
+    color: #f0f0f0;
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+h1 {
+    text-align: center;
+    margin-bottom: 30px;
+    color: #bb86fc;
+}
+
+.theremin-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+@media (min-width: 768px) {
+    .theremin-container {
+        flex-direction: row;
+    }
+}
+
+.video-container {
+    position: relative;
+    flex: 1;
+    background-color: #1e1e1e;
+    border-radius: 8px;
+    overflow: hidden;
+    aspect-ratio: 4/3;
+}
+
+video, #output-canvas {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+#output-canvas {
+    z-index: 10;
+}
+
+.controls {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.control-panel {
+    background-color: #1e1e1e;
+    border-radius: 8px;
+    padding: 20px;
+    height: 100%;
+}
+
+h2 {
+    color: #03dac6;
+    margin-bottom: 15px;
+}
+
+ul {
+    margin-left: 20px;
+    margin-bottom: 15px;
+}
+
+.parameters {
+    margin: 20px 0;
+    padding: 15px;
+    background-color: #2d2d2d;
+    border-radius: 8px;
+}
+
+.parameter {
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+}
+
+button {
+    display: block;
+    width: 100%;
+    padding: 12px;
+    background-color: #bb86fc;
+    color: #000;
+    border: none;
+    border-radius: 4px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+button:hover {
+    background-color: #9966cc;
+}
+
+button:disabled {
+    background-color: #555;
+    cursor: not-allowed;
+}
+
+.scale-controls {
+    margin: 15px 0;
+    padding: 10px;
+    background-color: #2d2d2d;
+    border-radius: 8px;
+}
+
+.scale-controls h3 {
+    color: #03dac6;
+    margin-bottom: 10px;
+    font-size: 1.1em;
+}
+
+.control-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+select {
+    background-color: #3d3d3d;
+    color: #f0f0f0;
+    border: none;
+    border-radius: 4px;
+    padding: 8px;
+    width: 60%;
+    cursor: pointer;
+}
+
+select:focus {
+    outline: 2px solid #bb86fc;
+}

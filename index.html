@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Theremin4Punks</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- MediaPipe Hands -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <!-- Tone.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Theremin4Punks</h1>
+        
+        <div class="theremin-container">
+            <div class="video-container">
+                <video id="video" playsinline></video>
+                <canvas id="output-canvas"></canvas>
+            </div>
+            
+            <div class="controls">
+                <div class="control-panel">
+                    <h2>Controlli</h2>
+                    <p>Muovi la mano:</p>
+                    <ul>
+                        <li><strong>Distanza indice pollice controllo reverbero</li>
+                        
+                    </ul>
+                        <div class="scale-controls">
+                        <h3>Impostazioni Scala</h3>
+                        <div class="control-row">
+                            <label for="scale-select">Scala:</label>
+                            <select id="scale-select">
+                                <option value="cromatica">Cromatica (tutte le note)</option>
+                                <option value="maggiore">Maggiore</option>
+                                <option value="minore">Minore</option>
+                                <option value="pentatonica">Pentatonica</option>
+                                <option value="blues">Blues</option>
+                            </select>
+                        </div>
+                        <div class="control-row">
+                            <label for="root-note">Nota base:</label>
+                            <select id="root-note">
+                                <option value="0">Do (C)</option>
+                                <option value="1">Do# (C#)</option>
+                                <option value="2">Re (D)</option>
+                                <option value="3">Re# (D#)</option>
+                                <option value="4">Mi (E)</option>
+                                <option value="5">Fa (F)</option>
+                                <option value="6">Fa# (F#)</option>
+                                <option value="7">Sol (G)</option>
+                                <option value="8">Sol# (G#)</option>
+                                <option value="9">La (A)</option>
+                                <option value="10">La# (A#)</option>
+                                <option value="11">Si (B)</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="parameters">
+                        <div class="parameter">
+                            <label>Frequenza: </label>
+                            <span id="frequency-value">0 Hz</span>
+                        </div>
+                        <div class="parameter">
+                            <label>Nota: </label>
+                            <span id="note-value">-</span>
+                        </div>
+                        <div class="parameter">
+                            <label>Volume: </label>
+                            <span id="volume-value">0 dB</span>
+                        </div>
+                        <div class="parameter">
+                            <label>Riverbero: </label>
+                            <span id="reverb-value">0</span>
+                        </div>
+                    </div>
+                    
+                    <button id="start-button">Avvia Theremin</button>
+                </div>
+            </div>
+        </div>
+        
+        <footer class="credits">
+            <p>made with vibes by <strong>Technology4Punks</strong></p>
+            
+        </footer>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
