@@ -9,6 +9,11 @@ const volumeValue = document.getElementById('volume-value');
 const reverbValue = document.getElementById('reverb-value');
 const scaleSelect = document.getElementById('scale-select');
 const rootNoteSelect = document.getElementById('root-note');
+const handStateValue = document.getElementById('hand-state');
+const lastDrumValue = document.getElementById('last-drum');
+const drumVolumeSlider = document.getElementById('drum-volume');
+const drumVolumeValue = document.getElementById('drum-volume-value');
+const leftHandModeSelect = document.getElementById('left-hand-mode');
 
 // Accedi alle classi MediaPipe dal namespace globale
 const Hands = window.Hands;
@@ -43,6 +48,17 @@ const camera = new Camera(videoElement, {
 let isPlaying = false;
 let synth = null;
 let reverb = null;
+
+// Nuove variabili per le percussioni
+let snarePlayer = null;
+let kickPlayer = null;
+let lastHandState = null;
+let drumVolume = -5;
+
+// Variabili per la modalità mano sinistra
+let leftHandMode = 'drums';
+let organSynth = null;
+let lastLeftHandY = 0;
 
 // Parametri del theremin
 const MIN_FREQ = 100;
@@ -164,11 +180,169 @@ function initToneJS() {
     // Collega il sintetizzatore al riverbero
     synth.connect(reverb);
     
+    // Crea i player per le percussioni
+    // Rullante (rumore bianco con filtro passa-alto)
+    const snareNoise = new Tone.Noise("white").start();
+    const snareFilter = new Tone.Filter({
+        frequency: 1000,
+        type: "highpass"
+    });
+    const snareEnv = new Tone.AmplitudeEnvelope({
+        attack: 0.001,
+        decay: 0.2,
+        sustain: 0,
+        release: 0.2
+    });
+    const snareGain = new Tone.Gain(0.5); // Controllo volume per rullante
+    
+    snareNoise.connect(snareFilter);
+    snareFilter.connect(snareEnv);
+    snareEnv.connect(snareGain);
+    snareGain.toDestination();
+    
+    snarePlayer = {
+        start: () => {
+            snareEnv.triggerAttackRelease("8n");
+        },
+        volume: snareGain
+    };
+    
+    // Cassa (oscillatore sinusoidale con inviluppo veloce)
+    const kickOsc = new Tone.Oscillator({
+        frequency: 60,
+        type: "sine"
+    });
+    const kickEnv = new Tone.AmplitudeEnvelope({
+        attack: 0.001,
+        decay: 0.3,
+        sustain: 0,
+        release: 0.3
+    });
+    const kickFilter = new Tone.Filter({
+        frequency: 200,
+        type: "lowpass"
+    });
+    const kickGain = new Tone.Gain(0.5); // Controllo volume per cassa
+    
+    kickOsc.connect(kickFilter);
+    kickFilter.connect(kickEnv);
+    kickEnv.connect(kickGain);
+    kickGain.toDestination();
+    kickOsc.start();
+    
+    kickPlayer = {
+        start: () => {
+            kickEnv.triggerAttackRelease("8n");
+        },
+        volume: kickGain
+    };
+    
+    // Crea il sintetizzatore per l'organo Hammond
+    // Oscillatori multipli per simulare le ruote tonali Hammond
+    const organOsc1 = new Tone.Oscillator({
+        type: 'sine',
+        frequency: 440
+    });
+    const organOsc2 = new Tone.Oscillator({
+        type: 'sine',
+        frequency: 880 // ottava superiore
+    });
+    const organOsc3 = new Tone.Oscillator({
+        type: 'sine',
+        frequency: 1320 // quinta dell'ottava superiore
+    });
+    
+    // Mixer per bilanciare gli oscillatori (inizia silenzioso)
+    const organMixer = new Tone.Gain(0);
+    const organGain1 = new Tone.Gain(0.8); // Fondamentale
+    const organGain2 = new Tone.Gain(0.6); // Ottava
+    const organGain3 = new Tone.Gain(0.4); // Quinta
+    
+    // Filtro passa-basso per ammorbidire il suono
+    const organFilter = new Tone.Filter({
+        frequency: 2000,
+        type: 'lowpass',
+        rolloff: -12
+    });
+    
+    // Chorus per l'effetto Hammond caratteristico
+    const organChorus = new Tone.Chorus({
+        frequency: 1.5,
+        delayTime: 3.5,
+        depth: 0.7,
+        wet: 0.5
+    }).start();
+    
+    // Distorsione leggera per il carattere Hammond
+    const organDistortion = new Tone.Distortion({
+        distortion: 0.1,
+        wet: 0.3
+    });
+    
+    // Connessioni audio
+    organOsc1.connect(organGain1);
+    organOsc2.connect(organGain2);
+    organOsc3.connect(organGain3);
+    
+    organGain1.connect(organMixer);
+    organGain2.connect(organMixer);
+    organGain3.connect(organMixer);
+    
+    organMixer.connect(organFilter);
+    organFilter.connect(organChorus);
+    organChorus.connect(organDistortion);
+    organDistortion.toDestination();
+    
+    // Avvia gli oscillatori
+    organOsc1.start();
+    organOsc2.start();
+    organOsc3.start();
+    
+    // Oggetto organSynth per compatibilità
+    organSynth = {
+        oscillators: [organOsc1, organOsc2, organOsc3],
+        mixer: organMixer,
+        filter: organFilter,
+        chorus: organChorus,
+        distortion: organDistortion,
+        triggerAttack: (frequency) => {
+            organOsc1.frequency.value = frequency;
+            organOsc2.frequency.value = frequency * 2; // ottava
+            organOsc3.frequency.value = frequency * 3; // quinta dell'ottava
+            organMixer.gain.rampTo(0.3, 0.1);
+        },
+        triggerRelease: () => {
+            organMixer.gain.rampTo(0, 0.2);
+        },
+        dispose: () => {
+            organOsc1.dispose();
+            organOsc2.dispose();
+            organOsc3.dispose();
+            organMixer.dispose();
+            organFilter.dispose();
+            organChorus.dispose();
+            organDistortion.dispose();
+        }
+    };
+    
     // Avvia il sintetizzatore
     synth.triggerAttack(MIN_FREQ);
     
     // Imposta il volume iniziale
     synth.volume.value = MIN_VOL;
+    
+    // Imposta il volume delle percussioni
+    updateDrumVolume();
+}
+
+// Funzione per aggiornare il volume delle percussioni
+function updateDrumVolume() {
+    if (snarePlayer && kickPlayer) {
+        // Converti da dB a gain lineare
+        const gainValue = Tone.dbToGain(drumVolume);
+        snarePlayer.volume.gain.value = gainValue;
+        kickPlayer.volume.gain.value = gainValue;
+    }
 }
 
 // Funzione per mappare un valore da un intervallo a un altro
@@ -201,195 +375,303 @@ function resizeCanvas() {
     canvasElement.style.height = videoElement.clientHeight + 'px';
 }
 
-// Gestione dei risultati del tracking delle mani
+// Funzione per rilevare se la mano è aperta o chiusa
+function detectHandState(landmarks) {
+    // Calcola le distanze tra le punte delle dita e il palmo
+    const palmCenter = landmarks[0]; // Centro del palmo
+    const fingerTips = [4, 8, 12, 16, 20]; // Punte di pollice, indice, medio, anulare, mignolo
+    
+    let openFingers = 0;
+    
+    // Controlla ogni dito
+    for (let i = 1; i < fingerTips.length; i++) { // Salta il pollice per ora
+        const fingerTip = landmarks[fingerTips[i]];
+        const fingerBase = landmarks[fingerTips[i] - 2]; // Base del dito
+        
+        // Se la punta del dito è più lontana dal palmo rispetto alla base, il dito è aperto
+        const tipDistance = calculateDistance(fingerTip, palmCenter);
+        const baseDistance = calculateDistance(fingerBase, palmCenter);
+        
+        if (tipDistance > baseDistance * 1.1) {
+            openFingers++;
+        }
+    }
+    
+    // Controllo speciale per il pollice
+    const thumbTip = landmarks[4];
+    const thumbBase = landmarks[2];
+    const indexBase = landmarks[5];
+    
+    const thumbToIndex = calculateDistance(thumbTip, indexBase);
+    const thumbBaseToIndex = calculateDistance(thumbBase, indexBase);
+    
+    if (thumbToIndex > thumbBaseToIndex * 1.2) {
+        openFingers++;
+    }
+    
+    // Se almeno 3 dita sono aperte, considera la mano aperta
+    return openFingers >= 3 ? 'aperta' : 'chiusa';
+}
+
+// Funzione per triggerare i suoni delle percussioni
+function triggerDrumSound(handState) {
+    if (handState !== lastHandState) {
+        if (handState === 'aperta' && snarePlayer) {
+            snarePlayer.start();
+            lastDrumValue.textContent = 'Rullante';
+        } else if (handState === 'chiusa' && kickPlayer) {
+            kickPlayer.start();
+            lastDrumValue.textContent = 'Cassa';
+        }
+        lastHandState = handState;
+    }
+}
+
+
+
+// Funzione per aggiornare il volume delle percussioni
+function updateDrumVolume() {
+    if (snarePlayer && kickPlayer) {
+        // Converti da dB a gain lineare
+        const gainValue = Tone.dbToGain(drumVolume);
+        snarePlayer.volume.gain.value = gainValue;
+        kickPlayer.volume.gain.value = gainValue;
+    }
+}
+
+// Nuova funzione per gestire l'organo
+function handleOrganMode(landmarks) {
+    const indexFingerTip = landmarks[8];
+    const palmCenter = landmarks[0];
+    
+    // Usa la posizione Y dell'indice per il pitch (più in alto = più acuto)
+    const organFrequency = mapRange(indexFingerTip.y, 0, 1, 800, 200); // Invertito: alto = acuto
+    
+    // Usa la distanza dal palmo per il volume
+    const distance = calculateDistance(indexFingerTip, palmCenter);
+    const organVolume = mapRange(distance, 0, 0.3, 0, 0.5); // Volume lineare da 0 a 0.5
+    
+    // Aggiorna la frequenza solo se c'è un cambiamento significativo
+    if (Math.abs(indexFingerTip.y - lastLeftHandY) > 0.01) {
+        // Aggiorna le frequenze di tutti gli oscillatori Hammond
+        organSynth.oscillators[0].frequency.value = organFrequency;
+        organSynth.oscillators[1].frequency.value = organFrequency * 2; // ottava
+        organSynth.oscillators[2].frequency.value = organFrequency * 3; // quinta dell'ottava
+        lastLeftHandY = indexFingerTip.y;
+    }
+    
+    // Aggiorna il volume tramite il mixer
+    organSynth.mixer.gain.value = Math.max(0, Math.min(0.5, organVolume));
+    
+    // Aggiorna i display
+    handStateValue.textContent = `Freq: ${Math.round(organFrequency)}Hz`;
+    lastDrumValue.textContent = `Vol: ${Math.round(organVolume * 100)}%`;
+}
+
+// Modifica la gestione della mano sinistra nella funzione onResults
+// Sostituisci la sezione "Gestisci la mano sinistra" con:
+// Aggiungi questa funzione dopo hands.setOptions
 hands.onResults((results) => {
     // Pulisci il canvas
     canvasCtx.save();
     canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+    canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
     
-    // Assicurati che il canvas abbia le dimensioni corrette
-    if (canvasElement.width !== videoElement.videoWidth || canvasElement.height !== videoElement.videoHeight) {
-        resizeCanvas();
-    }
+    // Variabili per le mani
+    let rightHand = null;
+    let leftHand = null;
     
-    try {
-        // Se ci sono mani rilevate
-        if (results.multiHandLandmarks && isPlaying) {
-            // Per ogni mano rilevata
-            for (let i = 0; i < results.multiHandLandmarks.length; i++) {
-                const landmarks = results.multiHandLandmarks[i];
-                const smoothedLandmarks = [];
-                
-                // Applica lo smoothing a ogni punto della mano
-                for (let j = 0; j < landmarks.length; j++) {
-                    const landmark = landmarks[j];
-                    const lastPosition = lastFingerPositions[j];
-                    
-                    // Calcola la velocità del movimento
-                    const movementSpeed = Math.sqrt(
-                        Math.pow(landmark.x - lastPosition.x, 2) + 
-                        Math.pow(landmark.y - lastPosition.y, 2)
-                    );
-                    
-                    // Smoothing adattivo: più veloce è il movimento, minore è lo smoothing
-                    const adaptiveSmoothingFactor = Math.max(0.1, Math.min(0.5, 0.5 - movementSpeed * 2));
-                    
-                    // Applica lo smoothing
-                    const smoothedPosition = {
-                        x: lastPosition.x * adaptiveSmoothingFactor + landmark.x * (1 - adaptiveSmoothingFactor),
-                        y: lastPosition.y * adaptiveSmoothingFactor + landmark.y * (1 - adaptiveSmoothingFactor),
-                        z: lastPosition.z * adaptiveSmoothingFactor + landmark.z * (1 - adaptiveSmoothingFactor)
-                    };
-                    
-                    // Aggiorna l'ultima posizione
-                    lastFingerPositions[j] = smoothedPosition;
-                    smoothedLandmarks.push(smoothedPosition);
-                }
-                
-                // Disegna i punti di riferimento della mano con i valori smussati
-                drawConnectors(canvasCtx, smoothedLandmarks, HAND_CONNECTIONS, { color: '#00FF00', lineWidth: 2 });
-                drawLandmarks(canvasCtx, smoothedLandmarks, { color: '#FF0000', lineWidth: 1 });
-                
-                // Se è la prima mano, usa i valori smussati per il controllo
-                if (i === 0) {
-                    // Usa la punta dell'indice (punto 8) per il controllo della frequenza
-                    const indexFingerTip = smoothedLandmarks[8];
-                    // Usa la punta del pollice (punto 4) per il controllo del volume
-                    const thumbTip = smoothedLandmarks[4];
-                    
-                    // Mappa la posizione X dell'indice al pitch (frequenza)
-                    const rawFrequency = mapRange(indexFingerTip.x, 0, 1, MIN_FREQ, MAX_FREQ);
-                    const frequency = snapToScale(rawFrequency);
-                    synth.frequency.value = frequency;
-                    frequencyValue.textContent = `${Math.round(frequency)} Hz`;
-                    
-                    // Aggiorna la visualizzazione della nota
-                    noteValue.textContent = getNoteName(frequency);
-                    
-                    // Mappa la posizione Y del pollice al volume
-                    const volume = mapRange(thumbTip.y, 0, 1, MAX_VOL, MIN_VOL);
-                    synth.volume.value = volume;
-                    volumeValue.textContent = `${Math.round(volume)} dB`;
-                    
-                    // Calcola la distanza tra pollice e indice per il controllo del riverbero
-                    const thumbIndexDistance = calculateDistance(thumbTip, indexFingerTip);
-                    
-                    // Mappa la distanza al riverbero (valori più piccoli per un controllo più preciso)
-                    const reverbAmount = mapRange(thumbIndexDistance, 0.05, 0.3, 0, 1);
-                    // Assicurati che il valore sia compreso tra 0 e 1
-                    const clampedReverbAmount = Math.min(1, Math.max(0, reverbAmount));
-                    reverb.wet.value = clampedReverbAmount;
-                    reverbValue.textContent = clampedReverbAmount.toFixed(2);
-                    
-                    // Disegna una linea tra pollice e indice per visualizzare il controllo del riverbero
-                    canvasCtx.beginPath();
-                    canvasCtx.moveTo(thumbTip.x * canvasElement.width, thumbTip.y * canvasElement.height);
-                    canvasCtx.lineTo(indexFingerTip.x * canvasElement.width, indexFingerTip.y * canvasElement.height);
-                    canvasCtx.strokeStyle = '#FFFF00';
-                    canvasCtx.lineWidth = 2;
-                    canvasCtx.stroke();
-                    
-                    // Evidenzia le dita attive
-                    canvasCtx.beginPath();
-                    canvasCtx.arc(
-                        smoothedLandmarks[8].x * canvasElement.width,
-                        smoothedLandmarks[8].y * canvasElement.height,
-                        15, 0, 2 * Math.PI
-                    );
-                    canvasCtx.fillStyle = 'rgba(255, 0, 0, 0.5)';
-                    canvasCtx.fill();
-                    
-                    canvasCtx.beginPath();
-                    canvasCtx.arc(
-                        smoothedLandmarks[4].x * canvasElement.width,
-                        smoothedLandmarks[4].y * canvasElement.height,
-                        15, 0, 2 * Math.PI
-                    );
-                    canvasCtx.fillStyle = 'rgba(0, 0, 255, 0.5)';
-                    canvasCtx.fill();
-                }
+    // Identifica le mani (destra e sinistra)
+    if (results.multiHandLandmarks && results.multiHandedness) {
+        for (let i = 0; i < results.multiHandLandmarks.length; i++) {
+            const landmarks = results.multiHandLandmarks[i];
+            const handedness = results.multiHandedness[i];
+            
+            // MediaPipe restituisce "Left" per la mano destra vista dalla camera
+            if (handedness.label === 'Left') {
+                rightHand = { landmarks };
+            } else {
+                leftHand = { landmarks };
             }
         }
-    } catch (error) {
-        console.error('Errore durante l\'elaborazione dei risultati:', error);
+    }
+    
+    // Gestisci la mano destra (theremin)
+    if (rightHand && isPlaying) {
+        const landmarks = rightHand.landmarks;
+        
+        // Disegna la mano destra
+        drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, { color: '#00FF00', lineWidth: 2 });
+        drawLandmarks(canvasCtx, landmarks, { color: '#FF0000', lineWidth: 1 });
+        
+        // Usa l'indice per il pitch e il pollice per il volume
+        const indexFingerTip = landmarks[8];
+        const thumbTip = landmarks[4];
+        
+        // Applica smoothing alle posizioni delle dita
+        lastFingerPositions[8].x = lastFingerPositions[8].x * fingerSmoothingFactor + indexFingerTip.x * (1 - fingerSmoothingFactor);
+        lastFingerPositions[8].y = lastFingerPositions[8].y * fingerSmoothingFactor + indexFingerTip.y * (1 - fingerSmoothingFactor);
+        lastFingerPositions[4].x = lastFingerPositions[4].x * fingerSmoothingFactor + thumbTip.x * (1 - fingerSmoothingFactor);
+        lastFingerPositions[4].y = lastFingerPositions[4].y * fingerSmoothingFactor + thumbTip.y * (1 - fingerSmoothingFactor);
+        
+        // Calcola la frequenza basata sulla posizione Y dell'indice
+        let frequency = mapRange(lastFingerPositions[8].y, 0, 1, MAX_FREQ, MIN_FREQ);
+        
+        // Applica la scala musicale
+        frequency = snapToScale(frequency);
+        
+        // Calcola il volume basato sulla posizione Y del pollice
+        const volume = mapRange(lastFingerPositions[4].y, 0, 1, MAX_VOL, MIN_VOL);
+        
+        // Calcola la distanza tra indice e pollice per il riverbero
+        const distance = calculateDistance(lastFingerPositions[8], lastFingerPositions[4]);
+        const reverbAmount = mapRange(distance, 0, 0.3, 0, 1);
+        
+        // Aggiorna il sintetizzatore
+        synth.frequency.value = frequency;
+        synth.volume.value = volume;
+        reverb.wet.value = Math.max(0, Math.min(1, reverbAmount));
+        
+        // Aggiorna i display
+        frequencyValue.textContent = Math.round(frequency);
+        noteValue.textContent = getNoteName(frequency);
+        volumeValue.textContent = Math.round(volume);
+        reverbValue.textContent = Math.round(reverbAmount * 100);
+        
+        // Disegna indicatori visivi
+        // Indicatore per il pitch (indice)
+        canvasCtx.beginPath();
+        canvasCtx.arc(
+            lastFingerPositions[8].x * canvasElement.width,
+            lastFingerPositions[8].y * canvasElement.height,
+            10, 0, 2 * Math.PI
+        );
+        canvasCtx.fillStyle = 'rgba(255, 255, 0, 0.7)';
+        canvasCtx.fill();
+        
+        // Indicatore per il volume (pollice)
+        canvasCtx.beginPath();
+        canvasCtx.arc(
+            lastFingerPositions[4].x * canvasElement.width,
+            lastFingerPositions[4].y * canvasElement.height,
+            8, 0, 2 * Math.PI
+        );
+        canvasCtx.fillStyle = 'rgba(0, 255, 255, 0.7)';
+        canvasCtx.fill();
+    }
+    
+    // Gestisci la mano sinistra
+    if (leftHand) {
+        const landmarks = leftHand.landmarks;
+        
+        // Disegna la mano sinistra
+        const handColor = leftHandMode === 'drums' ? '#0000FF' : '#FF8000';
+        drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, { color: handColor, lineWidth: 2 });
+        drawLandmarks(canvasCtx, landmarks, { color: '#00FFFF', lineWidth: 1 });
+        
+        if (leftHandMode === 'drums') {
+            // Modalità percussioni (codice esistente)
+            const handState = detectHandState(landmarks);
+            handStateValue.textContent = handState;
+            triggerDrumSound(handState);
+            
+            const palmCenter = landmarks[0];
+            canvasCtx.beginPath();
+            canvasCtx.arc(
+                palmCenter.x * canvasElement.width,
+                palmCenter.y * canvasElement.height,
+                20, 0, 2 * Math.PI
+            );
+            canvasCtx.fillStyle = handState === 'aperta' ? 'rgba(255, 255, 0, 0.7)' : 'rgba(255, 0, 255, 0.7)';
+            canvasCtx.fill();
+        } else if (leftHandMode === 'organ') {
+            // Modalità organo
+            handleOrganMode(landmarks);
+            
+            // Evidenzia il dito indice per l'organo
+            const indexTip = landmarks[8];
+            canvasCtx.beginPath();
+            canvasCtx.arc(
+                indexTip.x * canvasElement.width,
+                indexTip.y * canvasElement.height,
+                15, 0, 2 * Math.PI
+            );
+            canvasCtx.fillStyle = 'rgba(255, 128, 0, 0.7)';
+            canvasCtx.fill();
+        }
     }
     
     canvasCtx.restore();
 });
 
-
-
-// Gestione degli errori di MediaPipe
-hands.onError = (error) => {
-    console.error('Errore MediaPipe Hands:', error);
+// Aggiungi event listener per il cambio modalità
+leftHandModeSelect.addEventListener('change', (e) => {
+    leftHandMode = e.target.value;
     
-    // Se l'errore è fatale, riavvia MediaPipe
-    if (isPlaying) {
-        console.log('Tentativo di riavvio di MediaPipe...');
-        
-        // Ferma temporaneamente la camera
-        camera.stop();
-        
-        // Attendi un secondo e riavvia
-        setTimeout(() => {
-            if (isPlaying) {
-                camera.start();
-            }
-        }, 1000);
+    if (leftHandMode === 'organ' && organSynth && isPlaying) {
+        // Avvia l'organo quando si passa alla modalità organo
+        organSynth.triggerAttack(400);
+    } else if (leftHandMode === 'drums' && organSynth) {
+        // Ferma l'organo quando si passa alle percussioni
+        organSynth.triggerRelease();
     }
-};
-
-// Event listener per il selettore di scala
-scaleSelect.addEventListener('change', function() {
-    currentScale = this.value;
-    console.log('Scala cambiata a:', currentScale);
+    
+    // Reset dei display
+    handStateValue.textContent = '-';
+    lastDrumValue.textContent = '-';
 });
 
-// Event listener per il selettore di nota base
-rootNoteSelect.addEventListener('change', function() {
-    rootNote = parseInt(this.value);
-    console.log('Nota base cambiata a:', rootNote);
-});
+// Modifica la funzione di dispose per includere l'organo
+function disposeToneJS() {
+    if (synth) {
+        synth.triggerRelease();
+        synth.dispose();
+        synth = null;
+    }
+    if (reverb) {
+        reverb.dispose();
+        reverb = null;
+    }
+    if (organSynth) {
+        organSynth.triggerRelease();
+        organSynth.dispose();
+        organSynth = null;
+    }
+    if (snarePlayer) {
+        snarePlayer = null;
+    }
+    if (kickPlayer) {
+        kickPlayer = null;
+    }
+    camera.stop();
+    isPlaying = false;
+    startButton.textContent = 'Avvia Theremin';
+    lastHandState = null;
+}
 
-// Gestione del pulsante di avvio
-startButton.addEventListener('click', () => {
+// Event listener per il pulsante start/stop
+startButton.addEventListener('click', async () => {
     if (!isPlaying) {
-        // Avvia il theremin
-        startButton.disabled = true;
-        startButton.textContent = 'Avvio in corso...';
-        
-        Tone.start().then(() => {
-            try {
-                initToneJS();
-                camera.start();
-                isPlaying = true;
-                startButton.textContent = 'Ferma Theremin';
-            } catch (error) {
-                console.error('Errore durante l\'avvio:', error);
-                alert('Si è verificato un errore durante l\'avvio. Ricarica la pagina e riprova.');
-            } finally {
-                startButton.disabled = false;
-            }
-        }).catch(error => {
-            console.error('Errore durante l\'inizializzazione di Tone.js:', error);
-            alert('Si è verificato un errore con l\'audio. Assicurati di utilizzare un browser supportato.');
-            startButton.disabled = false;
-            startButton.textContent = 'Avvia Theremin';
-        });
+        try {
+            // Avvia Tone.js solo dopo l'interazione dell'utente
+            await Tone.start();
+            console.log('Audio context avviato');
+            
+            // Inizializza Tone.js
+            initToneJS();
+            
+            // Avvia la camera
+            await camera.start();
+            
+            isPlaying = true;
+            startButton.textContent = 'Ferma Theremin';
+        } catch (error) {
+            console.error('Errore durante l\'avvio:', error);
+            alert('Errore durante l\'avvio del theremin. Riprova.');
+        }
     } else {
-        // Ferma il theremin
-        if (synth) {
-            synth.triggerRelease();
-            synth.dispose();
-            synth = null;
-        }
-        if (reverb) {
-            reverb.dispose();
-            reverb = null;
-        }
-        camera.stop();
-        isPlaying = false;
-        startButton.textContent = 'Avvia Theremin';
+        // Ferma tutto
+        disposeToneJS();
     }
 });
 

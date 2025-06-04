@@ -81,7 +81,7 @@ ul {
 .parameters {
     margin: 20px 0;
     padding: 15px;
-    background-color: #2d2d2d;
+    background-color: #2a2a2a;
     border-radius: 8px;
 }
 
@@ -135,13 +135,21 @@ button:disabled {
 }
 
 select {
-    background-color: #3d3d3d;
-    color: #f0f0f0;
-    border: none;
-    border-radius: 4px;
-    padding: 8px;
-    width: 60%;
-    cursor: pointer;
+    #left-hand-mode {
+        background-color: #3d3d3d;
+        color: #f0f0f0;
+        border: 2px solid #bb86fc;
+        border-radius: 4px;
+        padding: 8px;
+        width: 60%;
+        cursor: pointer;
+        font-weight: bold;
+    }
+    
+    #left-hand-mode:focus {
+        outline: 2px solid #03dac6;
+        border-color: #03dac6;
+    }
 }
 
 select:focus {

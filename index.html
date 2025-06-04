@@ -26,12 +26,19 @@
             <div class="controls">
                 <div class="control-panel">
                     <h2>Controlli</h2>
-                    <p>Muovi la mano:</p>
+                    <p><strong>Mano Destra (Theremin):</strong></p>
                     <ul>
-                        <li><strong>Distanza indice pollice controllo reverbero</li>
-                        
+                        <li><strong>Indice (orizzontale):</strong> Controlla il pitch</li>
+                        <li><strong>Pollice (verticale):</strong> Controlla il volume</li>
                     </ul>
-                        <div class="scale-controls">
+                    <p><strong>Mano Sinistra (Percussioni):</strong></p>
+                    <ul>
+                        <li><strong>Mano aperta:</strong> Rullante</li>
+                        <li><strong>Mano chiusa:</strong> Cassa</li>
+                    </ul>
+                    <p><strong>Distanza tra le mani:</strong> Controlla il riverbero</p>
+                    
+                    <div class="scale-controls">
                         <h3>Impostazioni Scala</h3>
                         <div class="control-row">
                             <label for="scale-select">Scala:</label>
@@ -62,6 +69,22 @@
                         </div>
                     </div>
                     
+                    <div class="drum-controls">
+                        <h3>Controlli Mano Sinistra</h3>
+                        <div class="control-row">
+                            <label for="left-hand-mode">Modalità:</label>
+                            <select id="left-hand-mode">
+                                <option value="drums">Percussioni</option>
+                                <option value="organ">Organo</option>
+                            </select>
+                        </div>
+                        <div class="control-row">
+                            <label for="drum-volume">Volume:</label>
+                            <input type="range" id="drum-volume" min="-20" max="0" value="-5" step="1">
+                            <span id="drum-volume-value">-5 dB</span>
+                        </div>
+                    </div>
+                    
                     <div class="parameters">
                         <div class="parameter">
                             <label>Frequenza: </label>
@@ -79,17 +102,20 @@
                             <label>Riverbero: </label>
                             <span id="reverb-value">0</span>
                         </div>
+                        <div class="parameter">
+                            <label>Stato Mano Sinistra: </label>
+                            <span id="hand-state">-</span>
+                        </div>
+                        <div class="parameter">
+                            <label>Ultimo Suono: </label>
+                            <span id="last-drum">-</span>
+                        </div>
                     </div>
                     
                     <button id="start-button">Avvia Theremin</button>
                 </div>
             </div>
         </div>
-        
-        <footer class="credits">
-            <p>made with vibes by <strong>Technology4Punks</strong></p>
-            
-        </footer>
     </div>
     
     <script src="script.js"></script>
